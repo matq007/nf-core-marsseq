@@ -26,10 +26,10 @@ include { getGenomeAttribute      } from './subworkflows/local/utils_nfcore_mars
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-// TODO nf-core: Remove this line if you don't need a FASTA file
-//   This is an example of how to use getGenomeAttribute() to fetch parameters
-//   from igenomes.config using `--genome`
-params.fasta = getGenomeAttribute('fasta')
+params.fasta         = WorkflowMain.getGenomeAttribute(params, 'fasta')
+params.gtf           = WorkflowMain.getGenomeAttribute(params, 'gtf')
+params.bowtie2_index = WorkflowMain.getGenomeAttribute(params, 'bowtie2')
+params.star_index    = WorkflowMain.getGenomeAttribute(params, 'star')
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -47,12 +47,10 @@ workflow NFCORE_MARSSEQ {
 
     main:
 
-    //
-    // WORKFLOW: Run pipeline
-    //
     MARSSEQ (
         samplesheet
     )
+    
     emit:
     multiqc_report = MARSSEQ.out.multiqc_report // channel: /path/to/multiqc_report.html
 }
