@@ -47,7 +47,7 @@ workflow PREPARE_GENOME {
             ch_versions = ch_versions.mix(BOWTIE2_BUILD.out.versions)
         }
     }
-    
+
     if (aligner.contains('star')) {
         if (star_index) {
             ch_star_index = Channel.fromPath(star_index, checkIfExists: true).map { index -> [ [id:"target_index"], index ] }

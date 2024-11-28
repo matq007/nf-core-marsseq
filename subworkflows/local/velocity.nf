@@ -22,7 +22,7 @@ workflow VELOCITY {
     ch_reads = reads
         .map { meta, reads -> return [ meta, reads.sort().collate(2) ] }
         .transpose()
-    
+
     VELOCITY_CONVERT ( ch_reads )
     ch_versions = ch_versions.mix(VELOCITY_CONVERT.out.versions)
 

@@ -45,7 +45,7 @@ workflow MARSSEQ {
     main:
 
     ch_multiqc_files = Channel.empty()
-    
+
     //
     // MODULE: Run FastQC
     //
@@ -74,7 +74,7 @@ workflow MARSSEQ {
             PREPARE_PIPELINE.out.reads
         )
         ch_versions = ch_versions.mix(LABEL_READS.out.versions)
-    
+
         ALIGN_READS ( LABEL_READS.out.read, bowtie2_index, fasta, LABEL_READS.out.qc )
         ch_versions = ch_versions.mix(ALIGN_READS.out.versions)
 
@@ -83,7 +83,7 @@ workflow MARSSEQ {
             .map { meta, sam -> [ meta.id, sam ] }
             .groupTuple(by: [0], sort: { it.name })
             .map { batch, sams -> [ [ "id": batch ], sams ] }
-        
+
         // merged aligned SAM files
         MERGE_READS ( ch_aligned_reads )
         ch_versions = ch_versions.mix(MERGE_READS.out.versions)
