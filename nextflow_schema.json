@@ -52,7 +52,6 @@
                 "genome": {
                     "type": "string",
                     "description": "Name of Genomes reference.",
-                    "default": "mm10",
                     "fa_icon": "fas fa-book",
                     "help_text": "Currently supported mouse: `mm9`, `mm10` and human `GRCh38_v43`. The references are downloaded from [GENCODE](https://www.gencodegenes.org) database."
                 },
@@ -120,10 +119,11 @@
                     "fa_icon": "fas fa-map-signs",
                     "enum": ["bowtie2_star", "bowtie2", "star"]
                 },
-                "seq_center": {
-                    "type": "string",
-                    "description": "Sequencing center information to be added to read group of BAM files.",
-                    "fa_icon": "fas fa-synagogue"
+                "read_length": {
+                    "type": "integer",
+                    "default": 75,
+                    "description": "Raw read length",
+                    "fa_icon": "fas fa-ruler-horizontal"
                 }
             }
         },
@@ -136,11 +136,6 @@
                 "skip_fastqc": {
                     "type": "boolean",
                     "description": "Skip FastQC.",
-                    "fa_icon": "fas fa-fast-forward"
-                },
-                "skip_multiqc": {
-                    "type": "boolean",
-                    "description": "Skip MultiQC.",
                     "fa_icon": "fas fa-fast-forward"
                 },
                 "skip_qc": {
@@ -299,6 +294,12 @@
         },
         {
             "$ref": "#/$defs/institutional_config_options"
+        },
+        {
+            "$ref": "#/$defs/alignment_options"
+        },
+        {
+            "$ref": "#/$defs/process_skipping_options"
         },
         {
             "$ref": "#/$defs/generic_options"

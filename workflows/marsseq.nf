@@ -10,29 +10,41 @@ include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pi
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_marsseq_pipeline'
 
+include { CAT_CAT as MERGE_READS } from '../modules/nf-core/cat/cat/main'
+include { QC_REPORT              } from '../modules/local/qc/report/main'
+
+include { ALIGN_READS            } from '../subworkflows/local/align_reads'
+include { LABEL_READS            } from '../subworkflows/local/label_reads'
+include { PREPARE_PIPELINE       } from '../subworkflows/local/prepare_pipeline'
+include { DEMULTIPLEX_READS      } from '../subworkflows/local/demultiplex_reads'
+include { VELOCITY               } from '../subworkflows/local/velocity'
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN MAIN WORKFLOW
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
+// Required files for the pipeline
+ercc_regions            = file("$projectDir/data/ercc-regions.tsv")
+ch_oligos               = Channel.fromPath("$projectDir/data/oligos.txt", checkIfExists: true)
+ch_spike_seq            = Channel.fromPath("$projectDir/data/spike-seq.txt", checkIfExists: true)
+ch_spike_concentrations = Channel.fromPath("$projectDir/data/spike-concentrations.txt", checkIfExists: true)
+
 workflow MARSSEQ {
 
     take:
-    ch_samplesheet // channel: samplesheet read in from --input
-    
+    ch_samplesheet // channel: samplesheet read in from --input (ch_reads)
+    aligner        // string
+    fasta          // channel: [ meta, file(fasta) ]
+    gtf            // channel: [ meta, file(gtf) ]
+    bowtie2_index  // channel: [ meta, index ]
+    star_index     // channel: [ meta, index ]
+    ch_versions    // channel
+
     main:
 
-    ch_versions             = Channel.empty()
-    ch_multiqc_files        = Channel.empty()
-    ch_fasta                = file(params.fasta, checkIfExists: true)
-    ch_gtf                  = file(params.gtf, checkIfExists: true)
-    ch_bowtie_index         = file(params.bowtie2_index, checkIfExists: true)
-    ch_star_index           = file(params.star_index, checkIfExists: true)
-    ch_ercc_regions         = Channel.fromPath("$projectDir/data/ercc-regions.tsv")
-    ch_oligos               = Channel.fromPath("$projectDir/data/oligos.txt")
-    ch_spike_seq            = Channel.fromPath("$projectDir/data/spike-seq.txt")
-    ch_spike_concentrations = Channel.fromPath("$projectDir/data/spike-concentrations.txt")
+    ch_multiqc_files = Channel.empty()
     
     //
     // MODULE: Run FastQC
@@ -43,73 +55,78 @@ workflow MARSSEQ {
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]})
     ch_versions = ch_versions.mix(FASTQC.out.versions.first())
 
-    // PREPARE_PIPELINE (
-    //     INPUT_CHECK.out.reads.map { it[0].amp_batches },
-    //     INPUT_CHECK.out.reads.map { it[0].seq_batches },
-    //     INPUT_CHECK.out.reads.map { it[0].well_cells },
-    //     ch_gtf,
-    //     ch_ercc_regions,
-    //     INPUT_CHECK.out.reads
-    // )
-    // ch_versions = ch_versions.mix(PREPARE_PIPELINE.out.versions)
+    PREPARE_PIPELINE (
+        ch_samplesheet.map { it[0].amp_batches },
+        ch_samplesheet.map { it[0].seq_batches },
+        ch_samplesheet.map { it[0].well_cells },
+        gtf,
+        ercc_regions,
+        ch_samplesheet
+    )
+    ch_versions = ch_versions.mix(PREPARE_PIPELINE.out.versions)
 
-    // LABEL_READS (
-    //     ch_oligos,
-    //     PREPARE_PIPELINE.out.amp_batches,
-    //     PREPARE_PIPELINE.out.seq_batches,
-    //     PREPARE_PIPELINE.out.reads
-    // )
-    // ch_versions = ch_versions.mix(LABEL_READS.out.versions)
+    if (aligner.contains('bowtie2')) {
 
-    // ALIGN_READS ( LABEL_READS.out.read, ch_bowtie_index, LABEL_READS.out.qc )
-    // ch_versions = ch_versions.mix(ALIGN_READS.out.versions)
+        LABEL_READS (
+            ch_oligos,
+            PREPARE_PIPELINE.out.amp_batches,
+            PREPARE_PIPELINE.out.seq_batches,
+            PREPARE_PIPELINE.out.reads
+        )
+        ch_versions = ch_versions.mix(LABEL_READS.out.versions)
+    
+        ALIGN_READS ( LABEL_READS.out.read, bowtie2_index, fasta, LABEL_READS.out.qc )
+        ch_versions = ch_versions.mix(ALIGN_READS.out.versions)
 
-    // // merge sam files into one file
-    // ch_aligned_reads = ALIGN_READS.out.reads
-    //     .map { meta, sam -> [ meta.id, sam ] }
-    //     .groupTuple(by: [0], sort: { it.name })
-    //     .map { batch, sams -> [ [ "id": batch ], sams ] }
+        // merge sam files into one file
+        ch_aligned_reads = ALIGN_READS.out.reads
+            .map { meta, sam -> [ meta.id, sam ] }
+            .groupTuple(by: [0], sort: { it.name })
+            .map { batch, sams -> [ [ "id": batch ], sams ] }
+        
+        // merged aligned SAM files
+        MERGE_READS ( ch_aligned_reads )
+        ch_versions = ch_versions.mix(MERGE_READS.out.versions)
 
-    // // merged aligned SAM files
-    // MERGE_READS ( ch_aligned_reads )
-    // ch_versions = ch_versions.mix(MERGE_READS.out.versions)
+        DEMULTIPLEX_READS (
+            MERGE_READS.out.file_out,
+            PREPARE_PIPELINE.out.amp_batches,
+            PREPARE_PIPELINE.out.seq_batches,
+            PREPARE_PIPELINE.out.wells_cells,
+            PREPARE_PIPELINE.out.gene_intervals,
+            ch_spike_seq,
+            ch_spike_concentrations,
+            ch_oligos
+        )
+        ch_versions = ch_versions.mix(DEMULTIPLEX_READS.out.versions)
 
-    // DEMULTIPLEX_READS (
-    //     MERGE_READS.out.file_out,
-    //     PREPARE_PIPELINE.out.amp_batches,
-    //     PREPARE_PIPELINE.out.seq_batches,
-    //     PREPARE_PIPELINE.out.wells_cells,
-    //     PREPARE_PIPELINE.out.gene_intervals,
-    //     ch_spike_seq,
-    //     ch_spike_concentrations,
-    //     ch_oligos
-    // )
-    // ch_versions = ch_versions.mix(DEMULTIPLEX_READS.out.versions)
+        QC_REPORT (
+            DEMULTIPLEX_READS.out.qc_rd.map { meta, rds -> [ ["id": meta.id], rds ] }.groupTuple(),
+            DEMULTIPLEX_READS.out.qc_pdf.map { meta, pdf -> [ ["id": meta.id], pdf ] }.groupTuple(),
+            PREPARE_PIPELINE.out.amp_batches,
+            PREPARE_PIPELINE.out.wells_cells
+        )
+        ch_versions = ch_versions.mix(QC_REPORT.out.versions)
 
-    // QC_REPORT (
-    //     DEMULTIPLEX_READS.out.qc_rd.map { meta, rds -> [ ["id": meta.id], rds ] }.groupTuple(),
-    //     DEMULTIPLEX_READS.out.qc_pdf.map { meta, pdf -> [ ["id": meta.id], pdf ] }.groupTuple(),
-    //     PREPARE_PIPELINE.out.amp_batches,
-    //     PREPARE_PIPELINE.out.wells_cells
-    // )
-    // ch_versions = ch_versions.mix(QC_REPORT.out.versions)
+    }
 
-    // //
-    // // MODULE: Velocity
-    // //
-    // if (params.velocity) {
-    //     VELOCITY (
-    //         INPUT_CHECK.out.reads.map { it[0].amp_batches },
-    //         INPUT_CHECK.out.reads.map { it[0].well_cells },
-    //         PREPARE_PIPELINE.out.reads,
-    //         ch_star_index,
-    //         ch_gtf
-    //     )
-    //     ch_versions = ch_versions.mix(VELOCITY.out.versions)
+    //
+    // MODULE: Velocity
+    //
+    if (aligner.contains('star')) {
 
-    //     ch_multiqc_files = ch_multiqc_files.mix(VELOCITY.out.catadapt_multiqc.collect{it[1]}.ifEmpty([]))
-    //     ch_multiqc_files = ch_multiqc_files.mix(VELOCITY.out.star_multiqc.collect{it[1]}.ifEmpty([]))
-    // }
+        VELOCITY (
+            ch_samplesheet.map { it[0].amp_batches },
+            ch_samplesheet.map { it[0].well_cells },
+            PREPARE_PIPELINE.out.reads,
+            star_index
+        )
+        ch_versions = ch_versions.mix(VELOCITY.out.versions)
+
+        ch_multiqc_files = ch_multiqc_files.mix(VELOCITY.out.catadapt_multiqc.collect{it[1]}.ifEmpty([]))
+        ch_multiqc_files = ch_multiqc_files.mix(VELOCITY.out.star_multiqc.collect{it[1]}.ifEmpty([]))
+
+    }
 
     //
     // Collate and save software versions
@@ -121,7 +138,6 @@ workflow MARSSEQ {
             sort: true,
             newLine: true
         ).set { ch_collated_versions }
-
 
     //
     // MODULE: MultiQC
@@ -163,8 +179,9 @@ workflow MARSSEQ {
         []
     )
 
-    emit:multiqc_report = MULTIQC.out.report.toList() // channel: /path/to/multiqc_report.html
-    versions = ch_versions                            // channel: [ path(versions.yml) ]
+    emit:
+    multiqc_report = MULTIQC.out.report.toList() // channel: /path/to/multiqc_report.html
+    versions       = ch_versions                 // channel: [ path(versions.yml) ]
 
 }
 
