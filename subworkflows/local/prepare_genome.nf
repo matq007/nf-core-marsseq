@@ -2,10 +2,12 @@
 // Prepare reference genome files
 //
 
-include { ERCC_CREATE          } from '../../modules/local/ercc/main'
-include { CAT_CAT as CAT_FASTA } from '../../modules/nf-core/cat/cat/main'
-include { BOWTIE2_BUILD        } from '../../modules/nf-core/bowtie2/build/main'
-include { STAR_GENOMEGENERATE  } from '../../modules/nf-core/star/genomegenerate/main'
+include { BOWTIE2_BUILD          } from '../../modules/nf-core/bowtie2/build/main'
+include { CAT_CAT as CAT_FASTA   } from '../../modules/nf-core/cat/cat/main'
+include { ERCC_CREATE            } from '../../modules/local/ercc/main'
+include { GUNZIP as GUNZIP_FASTA } from '../../modules/nf-core/gunzip/main'
+include { GUNZIP as GUNZIP_GTF   } from '../../modules/nf-core/gunzip/main'
+include { STAR_GENOMEGENERATE    } from '../../modules/nf-core/star/genomegenerate/main'
 
 workflow PREPARE_GENOME {
 
@@ -19,11 +21,36 @@ workflow PREPARE_GENOME {
     main:
 
     ch_versions      = Channel.empty()
+    ch_fasta         = Channel.empty()
+    ch_gtf           = Channel.empty()
     ch_bowtie2_index = Channel.empty()
     ch_star_index    = Channel.empty()
-    ch_fasta         = Channel.fromPath(fasta, checkIfExists: true).map { fasta -> [ [id: fasta.baseName], fasta ] }
-    ch_gtf           = Channel.fromPath(gtf, checkIfExists: true).map { fasta -> [ [id: fasta.baseName], fasta ] }
 
+    //
+    // Uncompress genome fasta file if required
+    //
+    if (fasta.endsWith('.gz')) {
+        ch_fasta    = GUNZIP_FASTA ( [ [:], file(fasta, checkIfExists: true) ] ).gunzip.map { it[1] }
+        ch_versions = ch_versions.mix(GUNZIP_FASTA.out.versions)
+    } else {
+        ch_fasta = Channel.value(file(fasta, checkIfExists: true))
+    }
+    ch_fasta = ch_fasta.map { fasta -> [ [id: fasta.baseName], fasta ] }
+
+    //
+    // Uncompress annotation gtf file if required
+    //
+    if (fasta.endsWith('.gz')) {
+        ch_gtf      = GUNZIP_GTF ( [ [:], file(gtf, checkIfExists: true) ] ).gunzip.map { it[1] }
+        ch_versions = ch_versions.mix(GUNZIP_GTF.out.versions)
+    } else {
+        ch_gtf = Channel.value(file(gtf, checkIfExists: true))
+    }
+    ch_gtf = ch_gtf.map { gtf -> [ [id: gtf.baseName], gtf ] }
+
+    //
+    // Prepare genome by appending ERCC spike-ins
+    //
     if (!bowtie2_index || !star_index) {
 
         // Append ERCC (spike-ins) to the reference genome
