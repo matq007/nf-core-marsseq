@@ -3,6 +3,37 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [unreleased]
+
+### 🚀 Features
+
+- Merge with template and full refactor
+- Support for compressed genome references
+
+### 🐛 Bug Fixes
+
+- Linting issues
+- Test config
+- Check that provided xlsx files are not empty after subset
+- Missing openpyxl in conda specification
+- Missing openpyxl conda dependency
+- Replace ubuntu image with conda packages
+- Perl not anymore in bioconda channel
+- Move uncompressed genome and annotation to reference folder
+- Small and full AWS test
+
+### 💼 Other
+
+- Merge template 3.0.2 to dev
+
+### 📚 Documentation
+
+- Linting for CITATIONS
+
+### ⚙️ Miscellaneous Tasks
+
+- Merge pull request #22 from nf-core/nf-core-template-merge-3.0.2
+
 ## v1.0.3 - [11-07-2023]
 
 ### `Fixed`
