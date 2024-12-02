@@ -36,23 +36,13 @@ To run the pipeline you have create experiment metadata files:
 
 and samplesheet (`samplesheet.csv`). We provide test example [here](assets/samplesheet.csv).
 
-Next, you have to generate genome references to incorporate ERCC spike-ins. References are downloaded from [GENCODE](https://www.gencodegenes.org) database.
-
-```bash
-nextflow run nf-core/marsseq \
-  -profile <docker/singularity/.../institute> \
-  --genome <mm10,mm9,GRCh38_v43> \
-  --build_references \
-  --input samplsheet.csv \
-  --outdir <OUTDIR>
-```
-
 Now, you can run the pipeline using:
 
 ```bash
 nextflow run nf-core/marsseq \
   -profile <docker/singularity/.../institute> \
-  --genome <mm10,mm9,GRCh38_v43> \
+  --fasta https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M32/GRCm39.primary_assembly.genome.fa.gz \
+  --gtf https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M32/gencode.vM32.annotation.gtf.gz \
   --input samplesheet.csv \
   --outdir <OUTDIR>
 ```
