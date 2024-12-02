@@ -37,7 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - merge template 3.0.2 to dev - ([0b72b26](https://github.com/nf-core/marsseq/commit/0b72b2639d7f480cbf460533750343d5ad54d531))
 
-
 ## v1.0.3 - [11-07-2023]
 
 ### `Fixed`
